@@ -92,7 +92,7 @@ export function ExportPanel() {
           <TabsTrigger value="bricks" className="text-xs h-7">Bricks JSON</TabsTrigger>
           <TabsTrigger value="tailwind" className="text-xs h-7">Tailwind</TabsTrigger>
           <TabsTrigger value="tokens" className="text-xs h-7">Tokens</TabsTrigger>
-          <TabsTrigger value="guide" className="text-xs h-7">Import Guide</TabsTrigger>
+          <TabsTrigger value="guide" className="text-xs h-7">Integration Guide</TabsTrigger>
         </TabsList>
 
         <div className="mt-4">
@@ -112,22 +112,29 @@ export function ExportPanel() {
             <CodeBlock content={tokens} filename={`${palette.name.toLowerCase().replace(/\s/g,'-')}-tokens.json`} type="application/json" />
           </TabsContent>
           <TabsContent value="guide" className="m-0">
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <h3 className="text-base font-semibold mt-0">Importing into Bricks Builder</h3>
-              <ol className="text-sm space-y-3 text-muted-foreground list-decimal pl-4">
-                <li>Download the <strong className="text-foreground">Bricks JSON</strong> file using the tab above.</li>
-                <li>In your WordPress admin, go to <strong className="text-foreground">Bricks → Settings → Custom Fields</strong> (or navigate directly to the Bricks builder).</li>
-                <li>Open the <strong className="text-foreground">Color Manager</strong> from the left panel toolbar.</li>
-                <li>Click the <strong className="text-foreground">Import</strong> button (↑ icon) and select your downloaded JSON file.</li>
-                <li>Your color palette and all variants will appear grouped by color name.</li>
-                <li>The CSS variables are automatically available as <code className="text-foreground">--{'{variable}'}</code>, <code className="text-foreground">--{'{variable}'}-l-1</code> through <code className="text-foreground">--{'{variable}'}-l-10</code>, etc.</li>
-              </ol>
+            <div className="prose prose-sm dark:prose-invert max-w-none space-y-5">
+              <div>
+                <h3 className="text-sm font-semibold mt-0 text-foreground">CSS Custom Properties (Variables)</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Copy or download the CSS output and add it to your project's main stylesheet (inside the <code>:root</code> selector). The variables are enqueued globally, cascading automatically across all components, layout systems, and utility classes.
+                </p>
+              </div>
 
-              <h3 className="text-base font-semibold mt-6">Importing CSS variables</h3>
-              <p className="text-sm text-muted-foreground">Paste the CSS output into your theme's custom CSS field in WordPress, or enqueue it as a stylesheet. The variables will cascade to all child elements.</p>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Tailwind CSS Integration</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Incorporate the Tailwind configuration object in your <code>tailwind.config.js</code> file under <code>theme.extend.colors</code>. This maps your design tokens directly to Tailwind utility classes, allowing for syntax like <code>bg-primary</code>, <code>text-secondary-l-2</code>, etc.
+                </p>
+              </div>
 
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs mt-4">
-                <strong>Note:</strong> The Bricks JSON format may vary between Bricks versions. If import fails, try the CSS approach instead — it works universally.
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">WordPress &amp; Page Builders (Bricks Builder, etc.)</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  For <strong>Bricks Builder</strong>, download the <strong className="text-foreground">Bricks JSON</strong> file. Navigate to the Bricks builder color editor, click the Import icon, and select the JSON. Alternatively, pasting the generated CSS in the Custom CSS field or your child theme's stylesheet works universally across Gutenberg, Elementor, and Divi.
+                </p>
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] mt-2.5 leading-normal">
+                  <strong>Note:</strong> Bricks JSON structure may vary by builder version. If import issues arise, the CSS stylesheet is the recommended universal alternative.
+                </div>
               </div>
             </div>
           </TabsContent>

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Trash2, Plus, ChevronDown, ChevronUp, Settings2, Copy, FileUp } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronUp, Settings2, Copy, FileUp, GripVertical } from 'lucide-react';
 import { PresetSelector } from '@/components/editor/PresetSelector';
 import { ImportModal } from '@/components/editor/ImportModal';
 import { cn } from '@/lib/utils';
@@ -80,7 +80,7 @@ function ColorOptionsPanel({ id, options }: { id: string; options: ColorOptions 
 }
 
 export function ColorEditor() {
-  const { palette, updateColor, addColor, removeColor, duplicateColor } = usePaletteStore();
+  const { palette, updateColor, addColor, removeColor, duplicateColor, reorderColors } = usePaletteStore();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -88,6 +88,8 @@ export function ColorEditor() {
   const [newLight, setNewLight] = useState('#3b82f6');
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isDraggable, setIsDraggable] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => setExpanded(e => e === id ? null : id);
   const toggleAdvanced = (id: string) => setShowAdvanced(e => e === id ? null : id);
@@ -147,28 +149,57 @@ export function ColorEditor() {
       )}
 
       <div className="space-y-1.5">
-        {palette.colors.map((color) => (
+        {palette.colors.map((color, index) => (
           <div
             key={color.id}
+            draggable={isDraggable === color.id}
+            onDragStart={(e) => {
+              setDraggedIndex(index);
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={() => {
+              if (draggedIndex !== null && draggedIndex !== index) {
+                reorderColors(draggedIndex, index);
+                setDraggedIndex(index);
+              }
+            }}
+            onDragEnd={() => {
+              setDraggedIndex(null);
+              setIsDraggable(null);
+            }}
             className={cn(
-              "rounded-lg border transition-all duration-150",
+              "rounded-lg border transition-all duration-150 relative",
               expanded === color.id
                 ? "border-border bg-card shadow-sm"
-                : "border-transparent bg-card/60 hover:bg-card hover:border-border/60"
+                : "border-transparent bg-card/60 hover:bg-card hover:border-border/60",
+              draggedIndex === index && "opacity-40 border-dashed border-primary bg-primary/5"
             )}
           >
             {/* Color row */}
             <div
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+              className="flex items-center gap-1.5 pl-1.5 pr-3 py-2 cursor-pointer"
               onClick={() => toggleExpand(color.id)}
             >
+              {/* Drag Handle */}
+              <div
+                className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded text-muted-foreground/50 hover:text-foreground shrink-0 transition-colors"
+                onMouseDown={() => setIsDraggable(color.id)}
+                onMouseUp={() => setIsDraggable(null)}
+                onTouchStart={() => setIsDraggable(color.id)}
+                onTouchEnd={() => setIsDraggable(null)}
+                onClick={(e) => e.stopPropagation()} // prevent toggleExpand
+              >
+                <GripVertical className="h-3.5 w-3.5" />
+              </div>
+
               <div
                 className="h-5 w-5 rounded-md shadow-sm ring-1 ring-black/10 shrink-0"
                 style={{ background: color.light }}
               />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{color.name}</div>
-                <div className="text-[11px] text-muted-foreground font-mono truncate">--{color.variable}</div>
+                <div className="text-[11px] text-muted-foreground font-mono truncate font-sans">--{color.variable}</div>
               </div>
               {color.darkModeEnabled && (
                 <div className="h-4 w-4 rounded-sm ring-1 ring-black/10 shrink-0" style={{ background: color.dark || '#000' }} />

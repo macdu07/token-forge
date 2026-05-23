@@ -16,7 +16,7 @@ type ImportType = 'bricks' | 'css' | 'tokens';
 
 export function ImportModal({ open, onClose }: ImportModalProps) {
   const { importPalette } = usePaletteStore();
-  const [activeTab, setActiveTab] = useState<ImportType>('bricks');
+  const [activeTab, setActiveTab] = useState<ImportType>('css');
   const [inputText, setInputText] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -126,10 +126,6 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
         <div className="p-6 overflow-y-auto scrollbar-thin space-y-5">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid grid-cols-3 h-9 w-full">
-              <TabsTrigger value="bricks" className="text-xs">
-                <FileJson className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                Bricks JSON
-              </TabsTrigger>
               <TabsTrigger value="css" className="text-xs">
                 <Hash className="h-3.5 w-3.5 mr-1.5 shrink-0" />
                 CSS Code
@@ -137,6 +133,10 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
               <TabsTrigger value="tokens" className="text-xs">
                 <FileJson className="h-3.5 w-3.5 mr-1.5 shrink-0" />
                 Tokens JSON
+              </TabsTrigger>
+              <TabsTrigger value="bricks" className="text-xs">
+                <FileJson className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                Bricks JSON
               </TabsTrigger>
             </TabsList>
 

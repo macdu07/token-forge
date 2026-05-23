@@ -76,6 +76,7 @@ interface PaletteState {
   loadPreset: (colors: typeof SEMANTIC_COLORS) => void;
   duplicateColor: (id: string) => void;
   importPalette: (name: string, colors: Omit<PaletteColor, 'shades' | 'darkModeShades'>[]) => void;
+  reorderColors: (startIndex: number, endIndex: number) => void;
 }
 
 export const usePaletteStore = create<PaletteState>()(
@@ -85,6 +86,19 @@ export const usePaletteStore = create<PaletteState>()(
 
       renamePalette: (name) =>
         set((s) => ({ palette: { ...s.palette, name } })),
+
+      reorderColors: (startIndex, endIndex) =>
+        set((s) => {
+          const colors = [...s.palette.colors];
+          const [removed] = colors.splice(startIndex, 1);
+          colors.splice(endIndex, 0, removed);
+          return {
+            palette: {
+              ...s.palette,
+              colors,
+            },
+          };
+        }),
 
       updateColor: (id, updates) =>
         set((s) => ({
