@@ -11,6 +11,14 @@ type CategoryFilter = 'all' | 'radius' | 'space' | 'other';
 
 const SIZE_ORDER = ['5xs', '4xs', '3xs', '2xs', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl', '5xl'];
 
+type ScaleConfig = {
+  scaleRatio: number;
+  scaleUnit: 'px' | 'rem';
+  scaleBaseName: string;
+  scaleBaseMinSize: string;
+  scaleBaseMaxSize: string;
+};
+
 // ─── Math & Parsing Helpers ──────────────────────────────────────────────────
 
 function isScalingVariable(name: string): boolean {
@@ -76,11 +84,12 @@ function getNextSizeName(currentName: string, direction: 'larger' | 'smaller'): 
   return `${prefix}-${nextSize}`;
 }
 
-function parseClampMinMax(clampStr: string): { min: number; max: number } {
+function parseClampMinMax(clampStr: string): { min: number; max: number; unit: 'px' | 'rem' | 'other' } {
   const fixedMatch = clampStr.trim().match(/^([\d.]+)(px|rem|%|vw|vh)$/);
   if (fixedMatch) {
     const val = parseFloat(fixedMatch[1]);
-    return { min: val, max: val };
+    const u = fixedMatch[2] as any;
+    return { min: val, max: val, unit: u === 'px' || u === 'rem' ? u : 'other' };
   }
 
   const regex = /clamp\(\s*([\d.]+)(px|rem)\s*,\s*[^,]+\s*,\s*([\d.]+)(px|rem)\s*\)/i;
@@ -89,18 +98,21 @@ function parseClampMinMax(clampStr: string): { min: number; max: number } {
     return {
       min: parseFloat(match[1]),
       max: parseFloat(match[3]),
+      unit: match[2].toLowerCase() as any,
     };
   }
 
   const numbers = clampStr.match(/[\d.]+/g);
   if (numbers && numbers.length >= 2) {
+    const unit = clampStr.includes('rem') ? 'rem' : 'px';
     return {
       min: parseFloat(numbers[0]),
       max: parseFloat(numbers[numbers.length - 1]),
+      unit,
     };
   }
 
-  return { min: 8, max: 12 };
+  return { min: 8, max: 12, unit: 'px' };
 }
 
 function computeFluidClampFormula({
@@ -129,7 +141,7 @@ function computeFluidClampFormula({
   if (Math.abs(intersection) > 0.001) {
     const intersectionSign = intersection >= 0 ? '+' : '-';
     const absIntersectionVal = Math.abs(intersection);
-    intersectionPart = ` ${intersectionSign} ${absIntersectionVal.toFixed(2)}${unit}`;
+    intersectionPart = ` ${intersectionSign} ${absIntersectionVal.toFixed(4)}${unit}`;
   }
 
   return `clamp(${minSize}${unit}, calc(${slopeVw}vw${intersectionPart}), ${maxSize}${unit})`;
@@ -264,13 +276,11 @@ export function VariablesEditor() {
   const variables = palette.variables ?? [];
 
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<CategoryFilter>('radius'); // Default to radius to showcase the math
+  const [filter, setFilter] = useState<CategoryFilter>('radius');
   const [copied, setCopied] = useState(false);
 
-  // Scale settings state
-  const [scaleRatio, setScaleRatio] = useState(1.25);
+  // Global settings state
   const [remBase, setRemBase] = useState<10 | 16>(16);
-  const [scaleUnit, setScaleUnit] = useState<'px' | 'rem'>('px');
   const [minViewportPx, setMinViewportPx] = useState(360);
   const [maxViewportPx, setMaxViewportPx] = useState(1280);
 
@@ -279,19 +289,53 @@ export function VariablesEditor() {
   const [newValue, setNewValue] = useState('');
   const [newCategory, setNewCategory] = useState<'radius' | 'space' | 'other'>('radius');
 
-  // Regenerate scale section state
+  // Collapsible panel state
   const [showScalePanel, setShowScalePanel] = useState(false);
-  const [scaleBaseName, setScaleBaseName] = useState('m'); // Base size, e.g. "m"
-  const [scaleBaseMinSize, setScaleBaseMinSize] = useState('8'); // Min size (mobile)
-  const [scaleBaseMaxSize, setScaleBaseMaxSize] = useState('12'); // Max size (desktop)
-  const [scaleCategory, setScaleCategory] = useState<'radius' | 'space'>('radius');
+  const [scaleCategory, setScaleCategory] = useState<'radius' | 'space' | 'other'>('radius');
 
-  // Sync scale settings unit when filters change
+  // Independent configs state keyed by category
+  const [configs, setConfigs] = useState<Record<'radius' | 'space' | 'other', ScaleConfig>>({
+    radius: {
+      scaleRatio: 1.25,
+      scaleUnit: 'px',
+      scaleBaseName: 'm',
+      scaleBaseMinSize: '8',
+      scaleBaseMaxSize: '12',
+    },
+    space: {
+      scaleRatio: 1.25,
+      scaleUnit: 'rem',
+      scaleBaseName: 'm',
+      scaleBaseMinSize: '24',
+      scaleBaseMaxSize: '36',
+    },
+    other: {
+      scaleRatio: 1.25,
+      scaleUnit: 'px',
+      scaleBaseName: 'm',
+      scaleBaseMinSize: '16',
+      scaleBaseMaxSize: '24',
+    },
+  });
+
+  const updateConfig = (key: keyof ScaleConfig, value: any) => {
+    setConfigs((prev) => ({
+      ...prev,
+      [scaleCategory]: {
+        ...prev[scaleCategory],
+        [key]: value,
+      },
+    }));
+  };
+
+  // Sync scale panel category selection when the active filter pill shifts
   useEffect(() => {
     if (filter === 'space') {
       setScaleCategory('space');
     } else if (filter === 'radius') {
       setScaleCategory('radius');
+    } else if (filter === 'other') {
+      setScaleCategory('other');
     }
   }, [filter]);
 
@@ -325,7 +369,7 @@ export function VariablesEditor() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Generate size on bounds (first/last + click)
+  // Generate size on bounds (first/last + click) using category-specific configs
   const handleGenerateSize = (baseVar: CustomVariable, direction: 'larger' | 'smaller') => {
     const nextName = getNextSizeName(baseVar.name, direction);
 
@@ -334,14 +378,34 @@ export function VariablesEditor() {
       return;
     }
 
-    const { min, max } = parseClampMinMax(baseVar.value);
+    // Get config specific to this variable's category
+    const categoryConfig = configs[baseVar.category];
+    const { scaleRatio, scaleUnit } = categoryConfig;
+
+    let { min, max, unit: baseUnit } = parseClampMinMax(baseVar.value);
     
+    // Convert units if needed
+    if (baseUnit === 'rem' && scaleUnit === 'px') {
+      min = min * remBase;
+      max = max * remBase;
+      baseUnit = 'px';
+    } else if (baseUnit === 'px' && scaleUnit === 'rem') {
+      min = min / remBase;
+      max = max / remBase;
+      baseUnit = 'rem';
+    }
+
     let nextMin = direction === 'larger' ? min * scaleRatio : min / scaleRatio;
     let nextMax = direction === 'larger' ? max * scaleRatio : max / scaleRatio;
 
-    // Format clean numbers
-    nextMin = parseFloat(nextMin.toFixed(2));
-    nextMax = parseFloat(nextMax.toFixed(2));
+    // Formatting precision
+    if (scaleUnit === 'rem') {
+      nextMin = parseFloat(nextMin.toFixed(4));
+      nextMax = parseFloat(nextMax.toFixed(4));
+    } else {
+      nextMin = parseFloat(nextMin.toFixed(2));
+      nextMax = parseFloat(nextMax.toFixed(2));
+    }
 
     const computedVal = computeFluidClampFormula({
       minSize: nextMin,
@@ -355,8 +419,11 @@ export function VariablesEditor() {
     addVariable(nextName, computedVal, baseVar.category);
   };
 
-  // Regenerate scale of type
+  // Regenerate scale of active category using its specific configs
   const handleRegenerateScale = () => {
+    const currentConfig = configs[scaleCategory];
+    const { scaleRatio, scaleUnit, scaleBaseName, scaleBaseMinSize, scaleBaseMaxSize } = currentConfig;
+
     const baseMin = parseFloat(scaleBaseMinSize);
     const baseMax = parseFloat(scaleBaseMaxSize);
 
@@ -368,7 +435,6 @@ export function VariablesEditor() {
     const baseIndex = SIZE_ORDER.indexOf(scaleBaseName);
     if (baseIndex === -1) return;
 
-    // We generate sizes from xs to 2xl
     const targetSizes = ['xs', 's', 'm', 'l', 'xl', '2xl'];
 
     // 1. Delete existing scaling variables of this category
@@ -382,15 +448,19 @@ export function VariablesEditor() {
       const idx = SIZE_ORDER.indexOf(size);
       const diff = idx - baseIndex;
       
-      let nextMin = diff >= 0 ? baseMin * Math.pow(scaleRatio, diff) : baseMin / Math.pow(scaleRatio, -diff);
-      let nextMax = diff >= 0 ? baseMax * Math.pow(scaleRatio, diff) : baseMax / Math.pow(scaleRatio, -diff);
+      let nextMinPx = diff >= 0 ? baseMin * Math.pow(scaleRatio, diff) : baseMin / Math.pow(scaleRatio, -diff);
+      let nextMaxPx = diff >= 0 ? baseMax * Math.pow(scaleRatio, diff) : baseMax / Math.pow(scaleRatio, -diff);
 
-      nextMin = parseFloat(nextMin.toFixed(2));
-      nextMax = parseFloat(nextMax.toFixed(2));
+      // Convert to rem if scaleUnit is 'rem'
+      let finalMin = scaleUnit === 'rem' ? nextMinPx / remBase : nextMinPx;
+      let finalMax = scaleUnit === 'rem' ? nextMaxPx / remBase : nextMaxPx;
+
+      finalMin = parseFloat(finalMin.toFixed(scaleUnit === 'rem' ? 4 : 2));
+      finalMax = parseFloat(finalMax.toFixed(scaleUnit === 'rem' ? 4 : 2));
 
       const formula = computeFluidClampFormula({
-        minSize: nextMin,
-        maxSize: nextMax,
+        minSize: finalMin,
+        maxSize: finalMax,
         minViewportPx,
         maxViewportPx,
         unit: scaleUnit,
@@ -414,7 +484,7 @@ export function VariablesEditor() {
   );
 
   // Divide into timeline scaling variables and fixed variables
-  const isTimelineActive = filter === 'radius' || filter === 'space';
+  const isTimelineActive = filter === 'radius' || filter === 'space' || filter === 'other';
   let scalingVars: CustomVariable[] = [];
   let fixedVars: CustomVariable[] = [];
 
@@ -481,26 +551,8 @@ export function VariablesEditor() {
         </div>
       </div>
 
-      {/* Scale Settings Bar */}
-      <div className="p-3 bg-muted/20 border border-border/60 rounded-xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 items-center text-xs">
-        <div className="space-y-1">
-          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">Scale Ratio</Label>
-          <select
-            value={scaleRatio}
-            onChange={(e) => setScaleRatio(parseFloat(e.target.value))}
-            className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer focus:ring-1 focus:ring-ring"
-          >
-            <option value="1.125">1.125 — Major Second</option>
-            <option value="1.200">1.200 — Minor Third</option>
-            <option value="1.250">1.250 — Major Third</option>
-            <option value="1.333">1.333 — Perfect Fourth</option>
-            <option value="1.414">1.414 — Augmented Fourth</option>
-            <option value="1.500">1.500 — Perfect Fifth</option>
-            <option value="1.618">1.618 — Golden Ratio</option>
-            <option value="2.000">2.000 — Double</option>
-          </select>
-        </div>
-        
+      {/* Global Environment settings bar */}
+      <div className="p-3 bg-muted/20 border border-border/60 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 items-center text-xs">
         <div className="space-y-1">
           <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">REM Base Size</Label>
           <select
@@ -510,18 +562,6 @@ export function VariablesEditor() {
           >
             <option value="16">16px (Default Browser)</option>
             <option value="10">10px (62.5% html reset)</option>
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">Base Unit</Label>
-          <select
-            value={scaleUnit}
-            onChange={(e) => setScaleUnit(e.target.value as any)}
-            className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer focus:ring-1 focus:ring-ring"
-          >
-            <option value="px">Pixels (px)</option>
-            <option value="rem">Rem (rem)</option>
           </select>
         </div>
 
@@ -560,25 +600,56 @@ export function VariablesEditor() {
         </button>
 
         {showScalePanel && (
-          <div className="p-4 border-t border-border/50 bg-muted/5 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top duration-200">
+          <div className="p-4 border-t border-border/50 bg-muted/5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 animate-in slide-in-from-top duration-200">
             <div className="space-y-1.5">
               <Label className="text-[11px] text-muted-foreground">Scale Category</Label>
               <select
                 value={scaleCategory}
                 onChange={(e) => setScaleCategory(e.target.value as any)}
-                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full"
+                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full focus:ring-1 focus:ring-ring"
               >
                 <option value="radius">Radius Variables</option>
                 <option value="space">Spacing Variables</option>
+                <option value="other">Other Variables</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Scale Ratio</Label>
+              <select
+                value={configs[scaleCategory].scaleRatio}
+                onChange={(e) => updateConfig('scaleRatio', parseFloat(e.target.value))}
+                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full focus:ring-1 focus:ring-ring"
+              >
+                <option value="1.125">1.125 — Major Second</option>
+                <option value="1.200">1.200 — Minor Third</option>
+                <option value="1.250">1.250 — Major Third</option>
+                <option value="1.333">1.333 — Perfect Fourth</option>
+                <option value="1.414">1.414 — Augmented Fourth</option>
+                <option value="1.500">1.500 — Perfect Fifth</option>
+                <option value="1.618">1.618 — Golden Ratio</option>
+                <option value="2.000">2.000 — Double</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Base Unit</Label>
+              <select
+                value={configs[scaleCategory].scaleUnit}
+                onChange={(e) => updateConfig('scaleUnit', e.target.value as any)}
+                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full focus:ring-1 focus:ring-ring"
+              >
+                <option value="px">Pixels (px)</option>
+                <option value="rem">Rem (rem)</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-[11px] text-muted-foreground">Base Size Name</Label>
               <select
-                value={scaleBaseName}
-                onChange={(e) => setScaleBaseName(e.target.value)}
-                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full"
+                value={configs[scaleCategory].scaleBaseName}
+                onChange={(e) => updateConfig('scaleBaseName', e.target.value)}
+                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full focus:ring-1 focus:ring-ring"
               >
                 {SIZE_ORDER.map(sz => (
                   <option key={sz} value={sz}>{sz.toUpperCase()}</option>
@@ -587,32 +658,32 @@ export function VariablesEditor() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] text-muted-foreground">Mobile Base Size ({scaleUnit})</Label>
+              <Label className="text-[11px] text-muted-foreground">Mobile Base Size (px)</Label>
               <Input
                 type="number"
                 step="any"
-                value={scaleBaseMinSize}
-                onChange={(e) => setScaleBaseMinSize(e.target.value)}
-                className="h-7 text-xs bg-background"
+                value={configs[scaleCategory].scaleBaseMinSize}
+                onChange={(e) => updateConfig('scaleBaseMinSize', e.target.value)}
+                className="h-7 text-xs bg-background border-input"
                 placeholder="e.g. 8"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] text-muted-foreground">Desktop Base Size ({scaleUnit})</Label>
+              <Label className="text-[11px] text-muted-foreground">Desktop Base Size (px)</Label>
               <Input
                 type="number"
                 step="any"
-                value={scaleBaseMaxSize}
-                onChange={(e) => setScaleBaseMaxSize(e.target.value)}
-                className="h-7 text-xs bg-background"
+                value={configs[scaleCategory].scaleBaseMaxSize}
+                onChange={(e) => updateConfig('scaleBaseMaxSize', e.target.value)}
+                className="h-7 text-xs bg-background border-input"
                 placeholder="e.g. 12"
               />
             </div>
 
-            <div className="col-span-1 md:col-span-4 flex items-center justify-between border-t border-border/40 pt-3 mt-2">
-              <p className="text-[11px] text-muted-foreground max-w-lg leading-relaxed">
-                <strong>Attention:</strong> This will generate responsive scales from <strong>xs</strong> to <strong>2xl</strong> based on your scale ratio ({scaleRatio}), replacing previous scaling tokens of this category. Special tokens like <strong>full</strong> and <strong>50</strong> will remain unaffected.
+            <div className="col-span-1 sm:col-span-2 md:col-span-3 flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border/40 pt-3 mt-2 gap-3">
+              <p className="text-[11px] text-muted-foreground max-w-xl leading-relaxed">
+                <strong>Attention:</strong> This will generate responsive scales from <strong>xs</strong> to <strong>2xl</strong> based on the category settings, replacing previous scaling tokens of this category. Special tokens like <strong>full</strong> and <strong>50</strong> will remain unaffected.
               </p>
               <Button
                 size="sm"
