@@ -58,17 +58,17 @@ function makeInitialColor(s: typeof SEMANTIC_COLORS[0]): PaletteColor {
 }
 
 export const DEFAULT_VARIABLES: CustomVariable[] = [
-  { id: 'var-radius-xs', name: 'radius-xs', value: '4px', category: 'radius' },
-  { id: 'var-radius-s', name: 'radius-s', value: '8px', category: 'radius' },
-  { id: 'var-radius-m', name: 'radius-m', value: '12px', category: 'radius' },
-  { id: 'var-radius-l', name: 'radius-l', value: '16px', category: 'radius' },
-  { id: 'var-radius-xl', name: 'radius-xl', value: '24px', category: 'radius' },
+  { id: 'var-radius-xs', name: 'radius-xs', value: 'clamp(2px, calc(0.22vw + 1.22px), 4px)', category: 'radius' },
+  { id: 'var-radius-s', name: 'radius-s', value: 'clamp(4px, calc(0.43vw + 2.43px), 8px)', category: 'radius' },
+  { id: 'var-radius-m', name: 'radius-m', value: 'clamp(8px, calc(0.43vw + 6.43px), 12px)', category: 'radius' },
+  { id: 'var-radius-l', name: 'radius-l', value: 'clamp(12px, calc(0.43vw + 10.43px), 16px)', category: 'radius' },
+  { id: 'var-radius-xl', name: 'radius-xl', value: 'clamp(16px, calc(0.87vw + 12.87px), 24px)', category: 'radius' },
   { id: 'var-radius-full', name: 'radius-full', value: '9999px', category: 'radius' },
   
-  { id: 'var-space-xs', name: 'space-xs', value: 'clamp(0.75rem, calc(0.5rem + 1vw), 1.25rem)', category: 'space' },
-  { id: 'var-space-s', name: 'space-s', value: 'clamp(1rem, calc(0.75rem + 1.5vw), 1.75rem)', category: 'space' },
-  { id: 'var-space-m', name: 'space-m', value: 'clamp(1.5rem, calc(1rem + 2vw), 2.5rem)', category: 'space' },
-  { id: 'var-space-l', name: 'space-l', value: 'clamp(2rem, calc(1.5rem + 3vw), 3.5rem)', category: 'space' },
+  { id: 'var-space-xs', name: 'space-xs', value: 'clamp(12px, calc(0.43vw + 10.43px), 16px)', category: 'space' },
+  { id: 'var-space-s', name: 'space-s', value: 'clamp(16px, calc(0.87vw + 12.87px), 24px)', category: 'space' },
+  { id: 'var-space-m', name: 'space-m', value: 'clamp(24px, calc(1.3vw + 19.3px), 36px)', category: 'space' },
+  { id: 'var-space-l', name: 'space-l', value: 'clamp(32px, calc(1.74vw + 25.74px), 48px)', category: 'space' },
 ];
 
 const INITIAL_PALETTE: Palette = {

@@ -3,7 +3,8 @@ import { usePaletteStore } from '@/store/paletteStore';
 import type { CustomVariable } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Trash2, Copy, Search, Plus } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Trash2, Copy, Search, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type CategoryFilter = 'all' | 'radius' | 'space' | 'other';
@@ -74,7 +75,7 @@ function VariableRow({
           onChange={(e) => setLocalValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="bg-transparent font-mono text-xs text-foreground outline-none border-b border-transparent focus:border-primary/50 py-0.5 w-full hover:bg-muted/40 focus:bg-muted/65 px-1.5 rounded transition-colors truncate focus:truncate-none"
+          className="bg-transparent font-mono text-xs text-foreground outline-none border-b border-transparent focus:border-primary/50 py-0.5 w-full hover:bg-muted/40 focus:bg-muted/65 px-1.5 rounded transition-colors truncate focus:outline-none focus:w-full"
           placeholder="value (e.g. 8px, clamp(...))"
           title={localValue}
         />
@@ -124,23 +125,88 @@ export function VariablesEditor() {
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<CategoryFilter>('all');
+  const [copied, setCopied] = useState(false);
 
   // Add variable form state
   const [newName, setNewName] = useState('');
   const [newValue, setNewValue] = useState('');
   const [newCategory, setNewCategory] = useState<'radius' | 'space' | 'other'>('radius');
 
+  // Calculator state
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcUnit, setCalcUnit] = useState<'px' | 'rem'>('px');
+  const [calcMinSize, setCalcMinSize] = useState('16');
+  const [calcMaxSize, setCalcMaxSize] = useState('24');
+  const [calcMinView, setCalcMinView] = useState('360');
+  const [calcMaxView, setCalcMaxView] = useState('1280');
+  const [calcName, setCalcName] = useState('radius-xl');
+  const [calcCategory, setCalcCategory] = useState<'radius' | 'space' | 'other'>('radius');
+  const [computedFormula, setComputedFormula] = useState('');
+
+  // Handle calculator formula computation
+  useEffect(() => {
+    const minS = parseFloat(calcMinSize);
+    const maxS = parseFloat(calcMaxSize);
+    const minV = parseFloat(calcMinView);
+    const maxV = parseFloat(calcMaxView);
+
+    if (isNaN(minS) || isNaN(maxS) || isNaN(minV) || isNaN(maxV) || minV === maxV) {
+      setComputedFormula('');
+      return;
+    }
+
+    const slope = (maxS - minS) / (maxV - minV);
+    const intersection = minS - slope * minV;
+    const slopeVw = (slope * 100).toFixed(4);
+    
+    let intersectionPart = '';
+    if (Math.abs(intersection) > 0.001) {
+      const intersectionSign = intersection >= 0 ? '+' : '-';
+      const absIntersectionVal = Math.abs(intersection);
+      intersectionPart = ` ${intersectionSign} ${absIntersectionVal.toFixed(2)}${calcUnit}`;
+    }
+
+    const formula = `clamp(${minS}${calcUnit}, calc(${slopeVw}vw${intersectionPart}), ${maxS}${calcUnit})`;
+    setComputedFormula(formula);
+  }, [calcUnit, calcMinSize, calcMaxSize, calcMinView, calcMaxView]);
+
+  const handleAddCalculated = () => {
+    if (!calcName.trim() || !computedFormula) return;
+    const cleanName = calcName.trim().toLowerCase().replace(/\s+/g, '-').replace(/^--/, '');
+    addVariable(cleanName, computedFormula, calcCategory);
+    
+    // reset/close calculator
+    setShowCalculator(false);
+  };
+
   const handleAdd = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newName.trim() || !newValue.trim()) return;
 
-    // clean name
     const cleanName = newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/^--/, '');
     addVariable(cleanName, newValue.trim(), newCategory);
 
-    // reset fields
     setNewName('');
     setNewValue('');
+  };
+
+  const handleCopyFiltered = async () => {
+    const varsToCopy = filter === 'all'
+      ? variables
+      : variables.filter((v) => v.category === filter);
+
+    if (varsToCopy.length === 0) return;
+
+    const text = varsToCopy
+      .map((v) => {
+        const prefix = v.name.startsWith('--') ? '' : '--';
+        return `${prefix}${v.name}: ${v.value};`;
+      })
+      .join('\n');
+
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const filteredVariables = variables.filter((v) => {
@@ -165,23 +231,195 @@ export function VariablesEditor() {
           </p>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(['all', 'radius', 'space', 'other'] as CategoryFilter[]).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              className={cn(
-                "text-xs px-2.5 py-1 rounded-md border font-medium capitalize transition-all",
-                filter === cat
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted/30"
-              )}
-            >
-              {cat === 'space' ? 'spacing' : cat}
-            </button>
-          ))}
+        {/* Filter Pills & Copy button */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(['all', 'radius', 'space', 'other'] as CategoryFilter[]).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFilter(cat)}
+                className={cn(
+                  "text-xs px-2.5 py-1 rounded-md border font-medium capitalize transition-all",
+                  filter === cat
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted/30"
+                )}
+              >
+                {cat === 'space' ? 'spacing' : cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-4 w-px bg-border/60 mx-1 hidden sm:block" />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyFiltered}
+            className="text-xs h-7 gap-1.5 px-2.5 border-border/80"
+            title="Copy filtered CSS variables list"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? 'Copied!' : `Copy ${filter === 'all' ? 'All' : filter === 'space' ? 'Spacing' : filter.charAt(0).toUpperCase() + filter.slice(1)}`}
+          </Button>
         </div>
+      </div>
+
+      {/* Collapsible Calculator Panel */}
+      <div className="rounded-xl border border-border/60 bg-card/30 overflow-hidden">
+        <button
+          onClick={() => setShowCalculator(v => !v)}
+          className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span>Responsive Fluid clamp Generator (Slope math)</span>
+          </div>
+          <span>{showCalculator ? 'Hide Calculator' : 'Show Calculator'}</span>
+        </button>
+
+        {showCalculator && (
+          <div className="p-4 border-t border-border/50 bg-muted/5 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top duration-200">
+            {/* Left side: Inputs */}
+            <div className="col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[11px]">Unit</Label>
+                <div className="flex rounded-md border border-input overflow-hidden h-7">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCalcUnit('px');
+                      setCalcMinView('360');
+                      setCalcMaxView('1280');
+                      setCalcMinSize('16');
+                      setCalcMaxSize('24');
+                    }}
+                    className={cn(
+                      "flex-1 text-[11px] font-medium transition-colors",
+                      calcUnit === 'px' ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted/30"
+                    )}
+                  >
+                    px
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCalcUnit('rem');
+                      setCalcMinView('22.5');
+                      setCalcMaxView('80');
+                      setCalcMinSize('1');
+                      setCalcMaxSize('1.5');
+                    }}
+                    className={cn(
+                      "flex-1 text-[11px] font-medium transition-colors",
+                      calcUnit === 'rem' ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted/30"
+                    )}
+                  >
+                    rem
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px]">Variable Name</Label>
+                <Input
+                  value={calcName}
+                  onChange={(e) => setCalcName(e.target.value)}
+                  placeholder="e.g. radius-xl"
+                  className="h-7 text-xs font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px]">Category</Label>
+                <select
+                  value={calcCategory}
+                  onChange={(e) => setCalcCategory(e.target.value as any)}
+                  className="h-7 text-xs rounded bg-background border border-input text-foreground focus:outline-none px-2 py-0 cursor-pointer w-full"
+                >
+                  <option value="radius">Radius</option>
+                  <option value="space">Spacing</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px]">Min Size ({calcUnit})</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={calcMinSize}
+                  onChange={(e) => setCalcMinSize(e.target.value)}
+                  className="h-7 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px]">Max Size ({calcUnit})</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={calcMaxSize}
+                  onChange={(e) => setCalcMaxSize(e.target.value)}
+                  className="h-7 text-xs"
+                />
+              </div>
+              <div className="hidden sm:block" />
+
+              <div className="space-y-1">
+                <Label className="text-[11px]">Min Viewport ({calcUnit === 'px' ? 'px' : 'rem'})</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={calcMinView}
+                  onChange={(e) => setCalcMinView(e.target.value)}
+                  className="h-7 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px]">Max Viewport ({calcUnit === 'px' ? 'px' : 'rem'})</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={calcMaxView}
+                  onChange={(e) => setCalcMaxView(e.target.value)}
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Right side: Calculation Output */}
+            <div className="flex flex-col justify-between border-t md:border-t-0 md:border-l border-border/60 pt-4 md:pt-0 md:pl-4 space-y-3">
+              <div className="space-y-1.5">
+                <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Generated Formula</div>
+                <div className="bg-zinc-950 text-zinc-100 p-2.5 rounded-lg font-mono text-[11px] break-all leading-normal select-all">
+                  {computedFormula || 'Please enter valid inputs'}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (computedFormula) {
+                      await navigator.clipboard.writeText(computedFormula);
+                    }
+                  }}
+                  disabled={!computedFormula}
+                  className="flex-1 h-7 text-xs"
+                >
+                  Copy Formula
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleAddCalculated}
+                  disabled={!calcName.trim() || !computedFormula}
+                  className="flex-1 h-7 text-xs gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Variable
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table Container */}
