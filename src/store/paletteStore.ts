@@ -64,6 +64,7 @@ export const DEFAULT_VARIABLES: CustomVariable[] = [
   { id: 'var-radius-l', name: 'radius-l', value: 'clamp(12px, calc(0.43vw + 10.43px), 16px)', category: 'radius' },
   { id: 'var-radius-xl', name: 'radius-xl', value: 'clamp(16px, calc(0.87vw + 12.87px), 24px)', category: 'radius' },
   { id: 'var-radius-full', name: 'radius-full', value: '9999px', category: 'radius' },
+  { id: 'var-radius-50', name: 'radius-50', value: '50%', category: 'radius' },
   
   { id: 'var-space-xs', name: 'space-xs', value: 'clamp(12px, calc(0.43vw + 10.43px), 16px)', category: 'space' },
   { id: 'var-space-s', name: 'space-s', value: 'clamp(16px, calc(0.87vw + 12.87px), 24px)', category: 'space' },

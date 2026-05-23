@@ -4,26 +4,155 @@ import type { CustomVariable } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Trash2, Copy, Search, Plus, Check } from 'lucide-react';
+import { Trash2, Copy, Search, Plus, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type CategoryFilter = 'all' | 'radius' | 'space' | 'other';
+
+const SIZE_ORDER = ['5xs', '4xs', '3xs', '2xs', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl', '5xl'];
+
+// ─── Math & Parsing Helpers ──────────────────────────────────────────────────
+
+function isScalingVariable(name: string): boolean {
+  const parts = name.split('-');
+  if (parts.length < 2) return false;
+  const size = parts[parts.length - 1];
+  return SIZE_ORDER.includes(size);
+}
+
+function getVariableSizeIndex(name: string): number {
+  const parts = name.split('-');
+  const size = parts[parts.length - 1];
+  const idx = SIZE_ORDER.indexOf(size);
+  return idx !== -1 ? idx : 99;
+}
+
+function getNextSizeName(currentName: string, direction: 'larger' | 'smaller'): string {
+  const parts = currentName.split('-');
+  if (parts.length < 2) return currentName + (direction === 'larger' ? '-large' : '-small');
+  
+  const prefix = parts.slice(0, parts.length - 1).join('-');
+  const size = parts[parts.length - 1];
+  
+  let nextSize = size;
+  
+  if (direction === 'larger') {
+    if (size === '3xs') nextSize = '2xs';
+    else if (size === '2xs') nextSize = 'xs';
+    else if (size === 'xs') nextSize = 's';
+    else if (size === 's') nextSize = 'm';
+    else if (size === 'm') nextSize = 'l';
+    else if (size === 'l') nextSize = 'xl';
+    else if (size === 'xl') nextSize = '2xl';
+    else if (size.endsWith('xl')) {
+      const num = parseInt(size.replace('xl', ''), 10);
+      nextSize = isNaN(num) ? '2xl' : `${num + 1}xl`;
+    } else if (size.endsWith('xs')) {
+      const num = parseInt(size.replace('xs', ''), 10);
+      if (num <= 2) nextSize = 'xs';
+      else nextSize = `${num - 1}xs`;
+    } else {
+      nextSize = size + '-l';
+    }
+  } else { // smaller
+    if (size === 'm') nextSize = 's';
+    else if (size === 's') nextSize = 'xs';
+    else if (size === 'xs') nextSize = '2xs';
+    else if (size === '2xs') nextSize = '3xs';
+    else if (size.endsWith('xs')) {
+      const num = parseInt(size.replace('xs', ''), 10);
+      nextSize = isNaN(num) ? '2xs' : `${num + 1}xs`;
+    } else if (size.endsWith('xl')) {
+      const num = parseInt(size.replace('xl', ''), 10);
+      if (num <= 2) nextSize = 'xl';
+      else nextSize = `${num - 1}xl`;
+    } else if (size === 'l') nextSize = 'm';
+    else if (size === 'xl') nextSize = 'l';
+    else {
+      nextSize = size + '-s';
+    }
+  }
+  
+  return `${prefix}-${nextSize}`;
+}
+
+function parseClampMinMax(clampStr: string): { min: number; max: number } {
+  const fixedMatch = clampStr.trim().match(/^([\d.]+)(px|rem|%|vw|vh)$/);
+  if (fixedMatch) {
+    const val = parseFloat(fixedMatch[1]);
+    return { min: val, max: val };
+  }
+
+  const regex = /clamp\(\s*([\d.]+)(px|rem)\s*,\s*[^,]+\s*,\s*([\d.]+)(px|rem)\s*\)/i;
+  const match = clampStr.match(regex);
+  if (match) {
+    return {
+      min: parseFloat(match[1]),
+      max: parseFloat(match[3]),
+    };
+  }
+
+  const numbers = clampStr.match(/[\d.]+/g);
+  if (numbers && numbers.length >= 2) {
+    return {
+      min: parseFloat(numbers[0]),
+      max: parseFloat(numbers[numbers.length - 1]),
+    };
+  }
+
+  return { min: 8, max: 12 };
+}
+
+function computeFluidClampFormula({
+  minSize,
+  maxSize,
+  minViewportPx,
+  maxViewportPx,
+  unit,
+  remBase,
+}: {
+  minSize: number;
+  maxSize: number;
+  minViewportPx: number;
+  maxViewportPx: number;
+  unit: 'px' | 'rem';
+  remBase: 10 | 16;
+}): string {
+  const minV = unit === 'rem' ? minViewportPx / remBase : minViewportPx;
+  const maxV = unit === 'rem' ? maxViewportPx / remBase : maxViewportPx;
+
+  const slope = (maxSize - minSize) / (maxV - minV);
+  const intersection = minSize - slope * minV;
+  const slopeVw = (slope * 100).toFixed(4);
+  
+  let intersectionPart = '';
+  if (Math.abs(intersection) > 0.001) {
+    const intersectionSign = intersection >= 0 ? '+' : '-';
+    const absIntersectionVal = Math.abs(intersection);
+    intersectionPart = ` ${intersectionSign} ${absIntersectionVal.toFixed(2)}${unit}`;
+  }
+
+  return `clamp(${minSize}${unit}, calc(${slopeVw}vw${intersectionPart}), ${maxSize}${unit})`;
+}
+
+// ─── VariableRow subcomponent ───────────────────────────────────────────────
 
 function VariableRow({
   variable,
   onUpdate,
   onRemove,
   onDuplicate,
+  isTimeline,
 }: {
   variable: CustomVariable;
   onUpdate: (id: string, updates: Partial<CustomVariable>) => void;
   onRemove: (id: string) => void;
   onDuplicate: (id: string) => void;
+  isTimeline: boolean;
 }) {
   const [localName, setLocalName] = useState(variable.name);
   const [localValue, setLocalValue] = useState(variable.value);
 
-  // Sync state if store updates externally
   useEffect(() => {
     setLocalName(variable.name);
   }, [variable.name]);
@@ -38,7 +167,6 @@ function VariableRow({
     if (trimmedName && trimmedValue && (trimmedName !== variable.name || trimmedValue !== variable.value)) {
       onUpdate(variable.id, { name: trimmedName, value: trimmedValue });
     } else {
-      // Revert to original if empty
       setLocalName(variable.name);
       setLocalValue(variable.value);
     }
@@ -51,7 +179,17 @@ function VariableRow({
   };
 
   return (
-    <div className="group grid grid-cols-1 md:grid-cols-[1fr_auto_1.5fr_auto_auto] items-center gap-3 px-4 py-2 border-b border-border/40 hover:bg-muted/30 transition-colors">
+    <div className={cn(
+      "group grid grid-cols-1 md:grid-cols-[1fr_auto_1.5fr_auto_auto] items-center gap-3 py-2 border-b border-border/40 hover:bg-muted/30 transition-colors",
+      isTimeline ? "pl-11 pr-4" : "px-4"
+    )}>
+      {/* Bullet Dot for Timeline */}
+      {isTimeline && (
+        <div className="absolute left-[15px] top-0 bottom-0 flex items-center">
+          <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/35 border-2 border-background group-hover:bg-primary group-hover:scale-110 transition-all" />
+        </div>
+      )}
+
       {/* Variable Name input */}
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="text-muted-foreground/60 font-mono text-xs select-none">--</span>
@@ -119,65 +257,43 @@ function VariableRow({
   );
 }
 
+// ─── Main VariablesEditor component ─────────────────────────────────────────
+
 export function VariablesEditor() {
   const { palette, addVariable, updateVariable, removeVariable, duplicateVariable } = usePaletteStore();
   const variables = palette.variables ?? [];
 
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<CategoryFilter>('all');
+  const [filter, setFilter] = useState<CategoryFilter>('radius'); // Default to radius to showcase the math
   const [copied, setCopied] = useState(false);
+
+  // Scale settings state
+  const [scaleRatio, setScaleRatio] = useState(1.25);
+  const [remBase, setRemBase] = useState<10 | 16>(16);
+  const [scaleUnit, setScaleUnit] = useState<'px' | 'rem'>('px');
+  const [minViewportPx, setMinViewportPx] = useState(360);
+  const [maxViewportPx, setMaxViewportPx] = useState(1280);
 
   // Add variable form state
   const [newName, setNewName] = useState('');
   const [newValue, setNewValue] = useState('');
   const [newCategory, setNewCategory] = useState<'radius' | 'space' | 'other'>('radius');
 
-  // Calculator state
-  const [showCalculator, setShowCalculator] = useState(false);
-  const [calcUnit, setCalcUnit] = useState<'px' | 'rem'>('px');
-  const [calcMinSize, setCalcMinSize] = useState('16');
-  const [calcMaxSize, setCalcMaxSize] = useState('24');
-  const [calcMinView, setCalcMinView] = useState('360');
-  const [calcMaxView, setCalcMaxView] = useState('1280');
-  const [calcName, setCalcName] = useState('radius-xl');
-  const [calcCategory, setCalcCategory] = useState<'radius' | 'space' | 'other'>('radius');
-  const [computedFormula, setComputedFormula] = useState('');
+  // Regenerate scale section state
+  const [showScalePanel, setShowScalePanel] = useState(false);
+  const [scaleBaseName, setScaleBaseName] = useState('m'); // Base size, e.g. "m"
+  const [scaleBaseMinSize, setScaleBaseMinSize] = useState('8'); // Min size (mobile)
+  const [scaleBaseMaxSize, setScaleBaseMaxSize] = useState('12'); // Max size (desktop)
+  const [scaleCategory, setScaleCategory] = useState<'radius' | 'space'>('radius');
 
-  // Handle calculator formula computation
+  // Sync scale settings unit when filters change
   useEffect(() => {
-    const minS = parseFloat(calcMinSize);
-    const maxS = parseFloat(calcMaxSize);
-    const minV = parseFloat(calcMinView);
-    const maxV = parseFloat(calcMaxView);
-
-    if (isNaN(minS) || isNaN(maxS) || isNaN(minV) || isNaN(maxV) || minV === maxV) {
-      setComputedFormula('');
-      return;
+    if (filter === 'space') {
+      setScaleCategory('space');
+    } else if (filter === 'radius') {
+      setScaleCategory('radius');
     }
-
-    const slope = (maxS - minS) / (maxV - minV);
-    const intersection = minS - slope * minV;
-    const slopeVw = (slope * 100).toFixed(4);
-    
-    let intersectionPart = '';
-    if (Math.abs(intersection) > 0.001) {
-      const intersectionSign = intersection >= 0 ? '+' : '-';
-      const absIntersectionVal = Math.abs(intersection);
-      intersectionPart = ` ${intersectionSign} ${absIntersectionVal.toFixed(2)}${calcUnit}`;
-    }
-
-    const formula = `clamp(${minS}${calcUnit}, calc(${slopeVw}vw${intersectionPart}), ${maxS}${calcUnit})`;
-    setComputedFormula(formula);
-  }, [calcUnit, calcMinSize, calcMaxSize, calcMinView, calcMaxView]);
-
-  const handleAddCalculated = () => {
-    if (!calcName.trim() || !computedFormula) return;
-    const cleanName = calcName.trim().toLowerCase().replace(/\s+/g, '-').replace(/^--/, '');
-    addVariable(cleanName, computedFormula, calcCategory);
-    
-    // reset/close calculator
-    setShowCalculator(false);
-  };
+  }, [filter]);
 
   const handleAdd = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -209,11 +325,111 @@ export function VariablesEditor() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const filteredVariables = variables.filter((v) => {
-    const matchesSearch = v.name.toLowerCase().includes(search.toLowerCase()) || v.value.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === 'all' ? true : v.category === filter;
-    return matchesSearch && matchesFilter;
-  });
+  // Generate size on bounds (first/last + click)
+  const handleGenerateSize = (baseVar: CustomVariable, direction: 'larger' | 'smaller') => {
+    const nextName = getNextSizeName(baseVar.name, direction);
+
+    if (variables.some((v) => v.name === nextName)) {
+      alert(`The variable --${nextName} already exists!`);
+      return;
+    }
+
+    const { min, max } = parseClampMinMax(baseVar.value);
+    
+    let nextMin = direction === 'larger' ? min * scaleRatio : min / scaleRatio;
+    let nextMax = direction === 'larger' ? max * scaleRatio : max / scaleRatio;
+
+    // Format clean numbers
+    nextMin = parseFloat(nextMin.toFixed(2));
+    nextMax = parseFloat(nextMax.toFixed(2));
+
+    const computedVal = computeFluidClampFormula({
+      minSize: nextMin,
+      maxSize: nextMax,
+      minViewportPx,
+      maxViewportPx,
+      unit: scaleUnit,
+      remBase,
+    });
+
+    addVariable(nextName, computedVal, baseVar.category);
+  };
+
+  // Regenerate scale of type
+  const handleRegenerateScale = () => {
+    const baseMin = parseFloat(scaleBaseMinSize);
+    const baseMax = parseFloat(scaleBaseMaxSize);
+
+    if (isNaN(baseMin) || isNaN(baseMax)) {
+      alert('Please write valid numbers for the base values.');
+      return;
+    }
+
+    const baseIndex = SIZE_ORDER.indexOf(scaleBaseName);
+    if (baseIndex === -1) return;
+
+    // We generate sizes from xs to 2xl
+    const targetSizes = ['xs', 's', 'm', 'l', 'xl', '2xl'];
+
+    // 1. Delete existing scaling variables of this category
+    const scaleVarsToDelete = variables.filter(
+      (v) => v.category === scaleCategory && isScalingVariable(v.name)
+    );
+    scaleVarsToDelete.forEach((v) => removeVariable(v.id));
+
+    // 2. Generate new scale variables
+    targetSizes.forEach((size) => {
+      const idx = SIZE_ORDER.indexOf(size);
+      const diff = idx - baseIndex;
+      
+      let nextMin = diff >= 0 ? baseMin * Math.pow(scaleRatio, diff) : baseMin / Math.pow(scaleRatio, -diff);
+      let nextMax = diff >= 0 ? baseMax * Math.pow(scaleRatio, diff) : baseMax / Math.pow(scaleRatio, -diff);
+
+      nextMin = parseFloat(nextMin.toFixed(2));
+      nextMax = parseFloat(nextMax.toFixed(2));
+
+      const formula = computeFluidClampFormula({
+        minSize: nextMin,
+        maxSize: nextMax,
+        minViewportPx,
+        maxViewportPx,
+        unit: scaleUnit,
+        remBase,
+      });
+
+      const varName = `${scaleCategory}-${size}`;
+      addVariable(varName, formula, scaleCategory);
+    });
+
+    setShowScalePanel(false);
+  };
+
+  // Filter variables
+  const categoryVariables = filter === 'all'
+    ? variables
+    : variables.filter((v) => v.category === filter);
+
+  const searchFiltered = categoryVariables.filter(
+    (v) => v.name.toLowerCase().includes(search.toLowerCase()) || v.value.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Divide into timeline scaling variables and fixed variables
+  const isTimelineActive = filter === 'radius' || filter === 'space';
+  let scalingVars: CustomVariable[] = [];
+  let fixedVars: CustomVariable[] = [];
+
+  if (isTimelineActive) {
+    scalingVars = searchFiltered.filter((v) => isScalingVariable(v.name));
+    fixedVars = searchFiltered.filter((v) => !isScalingVariable(v.name));
+
+    // Sort scaling variables based on SIZE_ORDER index
+    scalingVars.sort((a, b) => getVariableSizeIndex(a.name) - getVariableSizeIndex(b.name));
+  } else {
+    fixedVars = searchFiltered;
+  }
+
+  const firstVar = scalingVars[0];
+  const lastVar = scalingVars[scalingVars.length - 1];
 
   return (
     <div className="space-y-4">
@@ -265,158 +481,147 @@ export function VariablesEditor() {
         </div>
       </div>
 
-      {/* Collapsible Calculator Panel */}
+      {/* Scale Settings Bar */}
+      <div className="p-3 bg-muted/20 border border-border/60 rounded-xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 items-center text-xs">
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">Scale Ratio</Label>
+          <select
+            value={scaleRatio}
+            onChange={(e) => setScaleRatio(parseFloat(e.target.value))}
+            className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer focus:ring-1 focus:ring-ring"
+          >
+            <option value="1.125">1.125 — Major Second</option>
+            <option value="1.200">1.200 — Minor Third</option>
+            <option value="1.250">1.250 — Major Third</option>
+            <option value="1.333">1.333 — Perfect Fourth</option>
+            <option value="1.414">1.414 — Augmented Fourth</option>
+            <option value="1.500">1.500 — Perfect Fifth</option>
+            <option value="1.618">1.618 — Golden Ratio</option>
+            <option value="2.000">2.000 — Double</option>
+          </select>
+        </div>
+        
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">REM Base Size</Label>
+          <select
+            value={remBase}
+            onChange={(e) => setRemBase(parseInt(e.target.value) as any)}
+            className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer focus:ring-1 focus:ring-ring"
+          >
+            <option value="16">16px (Default Browser)</option>
+            <option value="10">10px (62.5% html reset)</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">Base Unit</Label>
+          <select
+            value={scaleUnit}
+            onChange={(e) => setScaleUnit(e.target.value as any)}
+            className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer focus:ring-1 focus:ring-ring"
+          >
+            <option value="px">Pixels (px)</option>
+            <option value="rem">Rem (rem)</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">Min Viewport (px)</Label>
+          <Input
+            type="number"
+            value={minViewportPx}
+            onChange={(e) => setMinViewportPx(parseInt(e.target.value) || 360)}
+            className="h-7 text-xs bg-background border-input"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase font-semibold text-muted-foreground/75 tracking-wider">Max Viewport (px)</Label>
+          <Input
+            type="number"
+            value={maxViewportPx}
+            onChange={(e) => setMaxViewportPx(parseInt(e.target.value) || 1280)}
+            className="h-7 text-xs bg-background border-input"
+          />
+        </div>
+      </div>
+
+      {/* Collapsible Regenerate Scale Panel */}
       <div className="rounded-xl border border-border/60 bg-card/30 overflow-hidden">
         <button
-          onClick={() => setShowCalculator(v => !v)}
+          onClick={() => setShowScalePanel(v => !v)}
           className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span>Responsive Fluid clamp Generator (Slope math)</span>
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            <span>Fluid Scale Generator (Generate entire scale from base)</span>
           </div>
-          <span>{showCalculator ? 'Hide Calculator' : 'Show Calculator'}</span>
+          <span>{showScalePanel ? 'Hide Scale Tool' : 'Show Scale Tool'}</span>
         </button>
 
-        {showCalculator && (
-          <div className="p-4 border-t border-border/50 bg-muted/5 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top duration-200">
-            {/* Left side: Inputs */}
-            <div className="col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-[11px]">Unit</Label>
-                <div className="flex rounded-md border border-input overflow-hidden h-7">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCalcUnit('px');
-                      setCalcMinView('360');
-                      setCalcMaxView('1280');
-                      setCalcMinSize('16');
-                      setCalcMaxSize('24');
-                    }}
-                    className={cn(
-                      "flex-1 text-[11px] font-medium transition-colors",
-                      calcUnit === 'px' ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted/30"
-                    )}
-                  >
-                    px
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCalcUnit('rem');
-                      setCalcMinView('22.5');
-                      setCalcMaxView('80');
-                      setCalcMinSize('1');
-                      setCalcMaxSize('1.5');
-                    }}
-                    className={cn(
-                      "flex-1 text-[11px] font-medium transition-colors",
-                      calcUnit === 'rem' ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted/30"
-                    )}
-                  >
-                    rem
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px]">Variable Name</Label>
-                <Input
-                  value={calcName}
-                  onChange={(e) => setCalcName(e.target.value)}
-                  placeholder="e.g. radius-xl"
-                  className="h-7 text-xs font-mono"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px]">Category</Label>
-                <select
-                  value={calcCategory}
-                  onChange={(e) => setCalcCategory(e.target.value as any)}
-                  className="h-7 text-xs rounded bg-background border border-input text-foreground focus:outline-none px-2 py-0 cursor-pointer w-full"
-                >
-                  <option value="radius">Radius</option>
-                  <option value="space">Spacing</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-[11px]">Min Size ({calcUnit})</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={calcMinSize}
-                  onChange={(e) => setCalcMinSize(e.target.value)}
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px]">Max Size ({calcUnit})</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={calcMaxSize}
-                  onChange={(e) => setCalcMaxSize(e.target.value)}
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div className="hidden sm:block" />
-
-              <div className="space-y-1">
-                <Label className="text-[11px]">Min Viewport ({calcUnit === 'px' ? 'px' : 'rem'})</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={calcMinView}
-                  onChange={(e) => setCalcMinView(e.target.value)}
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px]">Max Viewport ({calcUnit === 'px' ? 'px' : 'rem'})</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={calcMaxView}
-                  onChange={(e) => setCalcMaxView(e.target.value)}
-                  className="h-7 text-xs"
-                />
-              </div>
+        {showScalePanel && (
+          <div className="p-4 border-t border-border/50 bg-muted/5 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top duration-200">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Scale Category</Label>
+              <select
+                value={scaleCategory}
+                onChange={(e) => setScaleCategory(e.target.value as any)}
+                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full"
+              >
+                <option value="radius">Radius Variables</option>
+                <option value="space">Spacing Variables</option>
+              </select>
             </div>
 
-            {/* Right side: Calculation Output */}
-            <div className="flex flex-col justify-between border-t md:border-t-0 md:border-l border-border/60 pt-4 md:pt-0 md:pl-4 space-y-3">
-              <div className="space-y-1.5">
-                <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Generated Formula</div>
-                <div className="bg-zinc-950 text-zinc-100 p-2.5 rounded-lg font-mono text-[11px] break-all leading-normal select-all">
-                  {computedFormula || 'Please enter valid inputs'}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    if (computedFormula) {
-                      await navigator.clipboard.writeText(computedFormula);
-                    }
-                  }}
-                  disabled={!computedFormula}
-                  className="flex-1 h-7 text-xs"
-                >
-                  Copy Formula
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleAddCalculated}
-                  disabled={!calcName.trim() || !computedFormula}
-                  className="flex-1 h-7 text-xs gap-1"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Variable
-                </Button>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Base Size Name</Label>
+              <select
+                value={scaleBaseName}
+                onChange={(e) => setScaleBaseName(e.target.value)}
+                className="h-7 w-full text-xs rounded bg-background border border-input focus:outline-none px-2 cursor-pointer w-full"
+              >
+                {SIZE_ORDER.map(sz => (
+                  <option key={sz} value={sz}>{sz.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Mobile Base Size ({scaleUnit})</Label>
+              <Input
+                type="number"
+                step="any"
+                value={scaleBaseMinSize}
+                onChange={(e) => setScaleBaseMinSize(e.target.value)}
+                className="h-7 text-xs bg-background"
+                placeholder="e.g. 8"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Desktop Base Size ({scaleUnit})</Label>
+              <Input
+                type="number"
+                step="any"
+                value={scaleBaseMaxSize}
+                onChange={(e) => setScaleBaseMaxSize(e.target.value)}
+                className="h-7 text-xs bg-background"
+                placeholder="e.g. 12"
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-4 flex items-center justify-between border-t border-border/40 pt-3 mt-2">
+              <p className="text-[11px] text-muted-foreground max-w-lg leading-relaxed">
+                <strong>Attention:</strong> This will generate responsive scales from <strong>xs</strong> to <strong>2xl</strong> based on your scale ratio ({scaleRatio}), replacing previous scaling tokens of this category. Special tokens like <strong>full</strong> and <strong>50</strong> will remain unaffected.
+              </p>
+              <Button
+                size="sm"
+                onClick={handleRegenerateScale}
+                className="h-8 gap-1 shadow-sm px-4 shrink-0 bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+              >
+                <Plus className="h-4 w-4" />
+                Generate Scale
+              </Button>
             </div>
           </div>
         )}
@@ -430,13 +635,16 @@ export function VariablesEditor() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search variables by name or value..."
+            placeholder={`Search variables in ${filter === 'all' ? 'all' : filter === 'space' ? 'spacing' : filter}...`}
             className="bg-transparent text-xs text-foreground placeholder-muted-foreground/60 w-full outline-none"
           />
         </div>
 
         {/* Header Row */}
-        <div className="hidden md:grid grid-cols-[1fr_auto_1.5fr_auto_auto] items-center gap-3 px-4 py-2 border-b border-border bg-muted/35 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className={cn(
+          "hidden md:grid grid-cols-[1fr_auto_1.5fr_auto_auto] items-center gap-3 py-2 border-b border-border bg-muted/35 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground",
+          isTimelineActive ? "pl-11 pr-4" : "px-4"
+        )}>
           <div>Variable Name</div>
           <div></div>
           <div>Value</div>
@@ -445,18 +653,92 @@ export function VariablesEditor() {
         </div>
 
         {/* List Content */}
-        <div className="divide-y divide-border/40 max-h-[480px] overflow-y-auto scrollbar-thin">
-          {filteredVariables.length > 0 ? (
-            filteredVariables.map((v) => (
-              <VariableRow
-                key={v.id}
-                variable={v}
-                onUpdate={updateVariable}
-                onRemove={removeVariable}
-                onDuplicate={duplicateVariable}
-              />
-            ))
-          ) : (
+        <div className="divide-y divide-border/40 max-h-[520px] overflow-y-auto scrollbar-thin relative">
+          
+          {/* Active timeline connectors */}
+          {isTimelineActive && scalingVars.length > 0 && (
+            <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-border/60 pointer-events-none" />
+          )}
+
+          {/* 1. TIMELINE SCALING VARIABLES */}
+          {isTimelineActive && scalingVars.length > 0 && (
+            <div className="flex flex-col">
+              
+              {/* Scale Generator: TOP (Smaller boundary) */}
+              {firstVar && (
+                <div className="pl-11 relative py-2 border-b border-border/20 flex items-center hover:bg-muted/10 group/top">
+                  <div className="absolute left-[10px] top-0 bottom-0 flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSize(firstVar, 'smaller')}
+                      className="w-5 h-5 rounded bg-amber-500 hover:bg-amber-600 text-black flex items-center justify-center transition-all shadow-sm hover:scale-105"
+                      title={`Generate smaller size: --${getNextSizeName(firstVar.name, 'smaller')}`}
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[3px]" />
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground font-mono font-medium pl-1 select-none">
+                    Generate smaller size: <span className="text-foreground/80">--{getNextSizeName(firstVar.name, 'smaller')}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Variable Rows */}
+              {scalingVars.map((v) => (
+                <VariableRow
+                  key={v.id}
+                  variable={v}
+                  onUpdate={updateVariable}
+                  onRemove={removeVariable}
+                  onDuplicate={duplicateVariable}
+                  isTimeline={true}
+                />
+              ))}
+
+              {/* Scale Generator: BOTTOM (Larger boundary) */}
+              {lastVar && (
+                <div className="pl-11 relative py-2 border-b border-border/20 flex items-center hover:bg-muted/10 group/bottom">
+                  <div className="absolute left-[10px] top-0 bottom-0 flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSize(lastVar, 'larger')}
+                      className="w-5 h-5 rounded bg-amber-500 hover:bg-amber-600 text-black flex items-center justify-center transition-all shadow-sm hover:scale-105"
+                      title={`Generate larger size: --${getNextSizeName(lastVar.name, 'larger')}`}
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[3px]" />
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground font-mono font-medium pl-1 select-none">
+                    Generate larger size: <span className="text-foreground/80">--{getNextSizeName(lastVar.name, 'larger')}</span>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* 2. FLAT LIST (NON-TIMELINE OR FIXED VARIABLES) */}
+          {fixedVars.length > 0 && (
+            <div className="flex flex-col">
+              {isTimelineActive && scalingVars.length > 0 && (
+                <div className="px-4 py-1.5 bg-muted/20 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70 border-b border-border/40 select-none">
+                  Fixed Variables (Not scaled)
+                </div>
+              )}
+              {fixedVars.map((v) => (
+                <VariableRow
+                  key={v.id}
+                  variable={v}
+                  onUpdate={updateVariable}
+                  onRemove={removeVariable}
+                  onDuplicate={duplicateVariable}
+                  isTimeline={false}
+                />
+              ))}
+            </div>
+          )}
+
+          {searchFiltered.length === 0 && (
             <div className="p-8 text-center text-xs text-muted-foreground">
               {search || filter !== 'all' ? 'No variables match the active filters.' : 'No variables defined yet.'}
             </div>
