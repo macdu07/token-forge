@@ -6,8 +6,10 @@
       <stop offset="100%" stop-color="#F97316" />
     </linearGradient>
   </defs>
+  <!-- T Path -->
   <path d="M 22,40 L 42,40 C 46.4,40 50,43.6 50,48 L 50,74 C 50,78.4 46.4,82 42,82 C 37.6,82 34,78.4 34,74" 
         stroke="url(#tf-grad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- F Path -->
   <path d="M 50,74 L 50,32 C 50,27.6 53.6,24 58,24 L 78,24 M 50,54 L 72,54" 
         stroke="url(#tf-grad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
 </svg>

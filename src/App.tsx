@@ -68,9 +68,34 @@ function App() {
         <div className="max-w-7xl mx-auto w-full flex items-center px-6 gap-4 h-full">
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 grid place-items-center shadow-sm">
-              <span className="text-[11px] font-bold text-white leading-none">TF</span>
-            </div>
+            <svg 
+              className="h-7 w-7 filter drop-shadow-sm" 
+              viewBox="0 0 100 100" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id="tf-header-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#8B5CF6" />
+                  <stop offset="50%" stopColor="#EC4899" />
+                  <stop offset="100%" stopColor="#F97316" />
+                </linearGradient>
+              </defs>
+              <path 
+                d="M 22,40 L 42,40 C 46.4,40 50,43.6 50,48 L 50,74 C 50,78.4 46.4,82 42,82 C 37.6,82 34,78.4 34,74" 
+                stroke="url(#tf-header-grad)" 
+                strokeWidth="10" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+              />
+              <path 
+                d="M 50,74 L 50,32 C 50,27.6 53.6,24 58,24 L 78,24 M 50,54 L 72,54" 
+                stroke="url(#tf-header-grad)" 
+                strokeWidth="10" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+              />
+            </svg>
             <span className="text-sm font-semibold tracking-tight hidden sm:block">TokenForge</span>
           </div>
 
