@@ -12,13 +12,43 @@ export function generateDarkVariant(lightColorStr: string): string {
   const base = oklch(parsed);
   if (!base) return lightColorStr;
 
-  // Target a perceptually bright but not blown-out value for dark backgrounds
-  const targetL = Math.min(0.82, Math.max(0.65, 1 - base.l! + 0.15));
+  const l = base.l ?? 0.5;
+  const c = base.c ?? 0;
+  const h = base.h ?? 0;
+
+  let targetL: number;
+
+  // If it's a neutral or near-neutral (low saturation)
+  if (c < 0.03) {
+    if (l > 0.85) {
+      // White/off-white becomes very dark gray/black
+      targetL = 0.15;
+    } else if (l < 0.25) {
+      // Black/dark gray becomes white/off-white
+      targetL = 0.95;
+    } else {
+      // Intermediate gray values are inverted
+      targetL = 1 - l;
+    }
+  } else {
+    // For chromatic accent colors:
+    if (l > 0.90) {
+      // Very light pastel backgrounds become dark backgrounds
+      targetL = 0.20;
+    } else if (l < 0.20) {
+      // Very dark accents become bright accents
+      targetL = 0.75;
+    } else {
+      // Standard accent colors: target a bright but not blown-out value
+      targetL = Math.min(0.82, Math.max(0.65, 1 - l + 0.15));
+    }
+  }
+
   const darkColor = {
     mode: 'oklch' as const,
     l: targetL,
-    c: Math.max(0, (base.c ?? 0) * 0.85), // slightly less saturated
-    h: base.h ?? 0,
+    c: Math.max(0, c * 0.85), // slightly less saturated
+    h: h,
   };
   return formatCss(darkColor);
 }
