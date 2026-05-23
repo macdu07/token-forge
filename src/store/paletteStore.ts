@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Palette, PaletteColor, ColorOptions } from '../types';
 import { DEFAULT_COLOR_OPTIONS } from '../types';
-import { generateShades, generateTransparentShades, generateDarkVariant } from '../lib/color-engine';
+import { generateShades, generateTransparentShades, generateDarkVariant, formatColorString } from '../lib/color-engine';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -70,6 +70,7 @@ interface PaletteState {
   renamePalette: (name: string) => void;
   updateColor: (id: string, updates: Partial<PaletteColor>) => void;
   updateColorOptions: (id: string, options: Partial<ColorOptions>) => void;
+  updateAllColorsOptions: (options: Partial<ColorOptions>) => void;
   addColor: (color: Omit<PaletteColor, 'shades' | 'darkModeShades'>) => void;
   removeColor: (id: string) => void;
   loadPreset: (colors: typeof SEMANTIC_COLORS) => void;
@@ -115,11 +116,34 @@ export const usePaletteStore = create<PaletteState>()(
         set((s) => ({
           palette: {
             ...s.palette,
-            colors: s.palette.colors.map((c) =>
-              c.id === id
-                ? recompute({ ...c, options: { ...(c.options ?? DEFAULT_COLOR_OPTIONS), ...options } })
-                : c
-            ),
+            colors: s.palette.colors.map((c) => {
+              if (c.id !== id) return c;
+              const nextLight = options.outputFormat ? formatColorString(c.light, options.outputFormat) : c.light;
+              const nextDark = c.dark && options.outputFormat ? formatColorString(c.dark, options.outputFormat) : c.dark;
+              return recompute({
+                ...c,
+                light: nextLight,
+                dark: nextDark,
+                options: { ...(c.options ?? DEFAULT_COLOR_OPTIONS), ...options },
+              });
+            }),
+          },
+        })),
+
+      updateAllColorsOptions: (options) =>
+        set((s) => ({
+          palette: {
+            ...s.palette,
+            colors: s.palette.colors.map((c) => {
+              const nextLight = options.outputFormat ? formatColorString(c.light, options.outputFormat) : c.light;
+              const nextDark = c.dark && options.outputFormat ? formatColorString(c.dark, options.outputFormat) : c.dark;
+              return recompute({
+                ...c,
+                light: nextLight,
+                dark: nextDark,
+                options: { ...(c.options ?? DEFAULT_COLOR_OPTIONS), ...options },
+              });
+            }),
           },
         })),
 

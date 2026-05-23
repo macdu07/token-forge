@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { toHex, formatColorString } from '@/lib/color-engine';
 
 function ColorOptionsPanel({ id, options }: { id: string; options: ColorOptions }) {
-  const { updateColorOptions } = usePaletteStore();
+  const { updateColorOptions, updateAllColorsOptions } = usePaletteStore();
   return (
     <div className="pt-3 border-t border-border/60 grid grid-cols-2 gap-3 animate-in slide-in-from-top-2 duration-200">
       <div className="space-y-1">
@@ -64,6 +64,16 @@ function ColorOptionsPanel({ id, options }: { id: string; options: ColorOptions 
           onChange={(e: any) => updateColorOptions(id, { hueShift: parseInt(e.target.value) })}
           className="w-full accent-primary h-1.5"
         />
+      </div>
+      <div className="col-span-2 pt-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full h-7 text-[11px] font-medium"
+          onClick={() => updateAllColorsOptions(options)}
+        >
+          Aplicar a todos los colores
+        </Button>
       </div>
     </div>
   );
