@@ -34,5 +34,19 @@ export function generateTokens(palette: Palette): string {
     tokens[color.variable] = group;
   });
 
+  if (palette.variables && palette.variables.length > 0) {
+    palette.variables.forEach(v => {
+      const cleanName = v.name.replace(/^--/, '');
+      let type = 'dimension';
+      if (v.category === 'radius') type = 'borderRadius';
+      if (v.category === 'space') type = 'spacing';
+
+      tokens[cleanName] = {
+        $value: v.value,
+        $type: type,
+      };
+    });
+  }
+
   return JSON.stringify(tokens, null, 2);
 }

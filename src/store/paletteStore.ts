@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Palette, PaletteColor, ColorOptions } from '../types';
+import type { Palette, PaletteColor, ColorOptions, CustomVariable } from '../types';
 import { DEFAULT_COLOR_OPTIONS } from '../types';
 import { generateShades, generateTransparentShades, generateDarkVariant, formatColorString } from '../lib/color-engine';
 
@@ -57,10 +57,25 @@ function makeInitialColor(s: typeof SEMANTIC_COLORS[0]): PaletteColor {
   });
 }
 
+export const DEFAULT_VARIABLES: CustomVariable[] = [
+  { id: 'var-radius-xs', name: 'radius-xs', value: '4px', category: 'radius' },
+  { id: 'var-radius-s', name: 'radius-s', value: '8px', category: 'radius' },
+  { id: 'var-radius-m', name: 'radius-m', value: '12px', category: 'radius' },
+  { id: 'var-radius-l', name: 'radius-l', value: '16px', category: 'radius' },
+  { id: 'var-radius-xl', name: 'radius-xl', value: '24px', category: 'radius' },
+  { id: 'var-radius-full', name: 'radius-full', value: '9999px', category: 'radius' },
+  
+  { id: 'var-space-xs', name: 'space-xs', value: 'clamp(0.75rem, calc(0.5rem + 1vw), 1.25rem)', category: 'space' },
+  { id: 'var-space-s', name: 'space-s', value: 'clamp(1rem, calc(0.75rem + 1.5vw), 1.75rem)', category: 'space' },
+  { id: 'var-space-m', name: 'space-m', value: 'clamp(1.5rem, calc(1rem + 2vw), 2.5rem)', category: 'space' },
+  { id: 'var-space-l', name: 'space-l', value: 'clamp(2rem, calc(1.5rem + 3vw), 3.5rem)', category: 'space' },
+];
+
 const INITIAL_PALETTE: Palette = {
   id: 'default-palette',
   name: 'My Palette',
   colors: SEMANTIC_COLORS.map(makeInitialColor),
+  variables: DEFAULT_VARIABLES,
 };
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -77,6 +92,10 @@ interface PaletteState {
   duplicateColor: (id: string) => void;
   importPalette: (name: string, colors: Omit<PaletteColor, 'shades' | 'darkModeShades'>[]) => void;
   reorderColors: (startIndex: number, endIndex: number) => void;
+  addVariable: (name: string, value: string, category: 'radius' | 'space' | 'other') => void;
+  updateVariable: (id: string, updates: Partial<CustomVariable>) => void;
+  removeVariable: (id: string) => void;
+  duplicateVariable: (id: string) => void;
 }
 
 export const usePaletteStore = create<PaletteState>()(
@@ -228,23 +247,109 @@ export const usePaletteStore = create<PaletteState>()(
             colors: colors.map((c) => recompute(c as PaletteColor)),
           },
         })),
+
+      addVariable: (name, value, category) =>
+        set((s) => {
+          const variables = s.palette.variables ?? [];
+          const cleanName = name.trim().toLowerCase().replace(/\s+/g, '-');
+          const id = `var-${cleanName}-${Date.now()}`;
+          const newVar: CustomVariable = {
+            id,
+            name: cleanName,
+            value: value.trim(),
+            category,
+          };
+          return {
+            palette: {
+              ...s.palette,
+              variables: [...variables, newVar],
+            },
+          };
+        }),
+
+      updateVariable: (id, updates) =>
+        set((s) => {
+          const variables = s.palette.variables ?? [];
+          const nextVariables = variables.map((v) => {
+            if (v.id !== id) return v;
+            const merged = { ...v, ...updates };
+            if (updates.name !== undefined) {
+              merged.name = updates.name.trim().toLowerCase().replace(/\s+/g, '-');
+            }
+            if (updates.value !== undefined) {
+              merged.value = updates.value.trim();
+            }
+            return merged;
+          });
+          return {
+            palette: {
+              ...s.palette,
+              variables: nextVariables,
+            },
+          };
+        }),
+
+      removeVariable: (id) =>
+        set((s) => {
+          const variables = s.palette.variables ?? [];
+          return {
+            palette: {
+              ...s.palette,
+              variables: variables.filter((v) => v.id !== id),
+            },
+          };
+        }),
+
+      duplicateVariable: (id) =>
+        set((s) => {
+          const variables = s.palette.variables ?? [];
+          const varToDup = variables.find((v) => v.id === id);
+          if (!varToDup) return {};
+
+          const suffix = '-copy';
+          let baseName = varToDup.name;
+          if (baseName.endsWith('-copy')) {
+            baseName = baseName.replace(/-copy$/, '');
+          }
+          let newName = `${baseName}${suffix}`;
+          let counter = 1;
+          while (variables.some((v) => v.name === newName)) {
+            newName = `${baseName}${suffix}-${counter}`;
+            counter++;
+          }
+
+          const newVar: CustomVariable = {
+            id: `var-${newName}-${Date.now()}`,
+            name: newName,
+            value: varToDup.value,
+            category: varToDup.category,
+          };
+
+          return {
+            palette: {
+              ...s.palette,
+              variables: [...variables, newVar],
+            },
+          };
+        }),
     }),
     {
       name: 'tokenforge-palette',
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       // Migrate stale persisted data — rebuild all shades and add missing options
       migrate: (persistedState: unknown, fromVersion) => {
-        console.log(`[TokenForge] Migrating palette store v${fromVersion} → v2`);
+        console.log(`[TokenForge] Migrating palette store v${fromVersion} → v3`);
         const state = (persistedState as any) ?? {};
-        const palette: Palette = state.palette ?? INITIAL_PALETTE;
+        const palette = state.palette ?? INITIAL_PALETTE;
         return {
           ...state,
           palette: {
             ...palette,
-            colors: palette.colors.map((c: PaletteColor) =>
+            colors: (palette.colors ?? []).map((c: PaletteColor) =>
               recompute({ ...c, options: c.options ?? DEFAULT_COLOR_OPTIONS })
             ),
+            variables: palette.variables ?? DEFAULT_VARIABLES,
           },
         };
       },

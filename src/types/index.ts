@@ -37,10 +37,18 @@ export type PaletteColor = {
   };
 };
 
+export type CustomVariable = {
+  id: string;
+  name: string;      // e.g. "radius-s"
+  value: string;     // e.g. "8px" or "clamp(...)"
+  category: 'radius' | 'space' | 'other';
+};
+
 export type Palette = {
   id: string;
   name: string;
   colors: PaletteColor[];
+  variables?: CustomVariable[];
 };
 
 export const DEFAULT_COLOR_OPTIONS: ColorOptions = {

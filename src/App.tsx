@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ColorEditor } from '@/components/editor/ColorEditor';
+import { VariablesEditor } from '@/components/editor/VariablesEditor';
 import { PaletteRamp } from '@/components/preview/PaletteRamp';
 import { ComponentPreview } from '@/components/preview/ComponentPreview';
 import { ContrastChecker } from '@/components/preview/ContrastChecker';
@@ -131,6 +132,7 @@ function App() {
                 <TabsList className="h-8 w-full justify-start overflow-x-auto scrollbar-none flex-nowrap whitespace-nowrap lg:justify-start">
                   <TabsTrigger value="editor" className="text-xs h-7 lg:hidden shrink-0">Colors</TabsTrigger>
                   <TabsTrigger value="ramps" className="text-xs h-7 shrink-0">Color Ramps</TabsTrigger>
+                  <TabsTrigger value="variables" className="text-xs h-7 shrink-0">Variables</TabsTrigger>
                   <TabsTrigger value="components" className="text-xs h-7 shrink-0">Components</TabsTrigger>
                   <TabsTrigger value="contrast" className="text-xs h-7 shrink-0">Contrast</TabsTrigger>
                   <TabsTrigger value="export" className="text-xs h-7 shrink-0">Export</TabsTrigger>
@@ -151,6 +153,10 @@ function App() {
 
               <TabsContent value="contrast" className="m-0 focus-visible:outline-none palette-preview-container">
                 <ContrastChecker />
+              </TabsContent>
+
+              <TabsContent value="variables" className="m-0 focus-visible:outline-none">
+                <VariablesEditor />
               </TabsContent>
 
               <TabsContent value="export" className="m-0 focus-visible:outline-none">

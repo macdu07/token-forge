@@ -22,6 +22,16 @@ export function generateSCSS(palette: Palette, darkSelector = '.dark'): string {
     }
   });
 
+  // Add custom variables
+  if (palette.variables && palette.variables.length > 0) {
+    root += `// Custom Variables\n`;
+    palette.variables.forEach((v) => {
+      const cleanName = v.name.replace(/^--/, '');
+      root += `$${cleanName}: ${v.value};\n`;
+    });
+    root += '\n';
+  }
+
   dark += '}\n';
   return hasDark ? root + dark : root;
 }

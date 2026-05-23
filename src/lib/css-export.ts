@@ -28,6 +28,16 @@ export function generateCSS(palette: Palette, darkSelector: string = '.dark', ro
     }
   });
 
+  // Add custom variables
+  if (palette.variables && palette.variables.length > 0) {
+    rootCSS += `  /* Custom Variables */\n`;
+    palette.variables.forEach(v => {
+      const prefix = v.name.startsWith('--') ? '' : '--';
+      rootCSS += `  ${prefix}${v.name}: ${v.value};\n`;
+    });
+    rootCSS += '\n';
+  }
+
   rootCSS += `}\n\n`;
   darkCSS += `}\n`;
 
