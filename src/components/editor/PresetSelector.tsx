@@ -29,7 +29,7 @@ export function PresetSelector() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-50 w-72 rounded-xl border border-border bg-popover shadow-2xl p-2 space-y-1 animate-in slide-in-from-top-2 duration-150">
+          <div className="absolute right-0 top-8 z-50 w-72 max-w-[calc(100vw-32px)] rounded-xl border border-border bg-popover shadow-2xl p-2 space-y-1 animate-in slide-in-from-top-2 duration-150">
             <div className="px-2 py-1.5 text-[11px] font-semibold uppercase text-muted-foreground tracking-wider">
               Presets
             </div>

@@ -39,16 +39,19 @@ function PaletteName() {
   return (
     <button
       onClick={() => { setDraft(palette.name); setEditing(true); }}
-      className="flex items-center gap-1.5 text-sm font-semibold hover:text-muted-foreground transition-colors group"
+      className="flex items-center gap-1.5 text-sm font-semibold hover:text-muted-foreground transition-colors group truncate max-w-[150px] sm:max-w-xs"
     >
-      {palette.name}
-      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+      <span className="truncate">{palette.name}</span>
+      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
     </button>
   );
 }
 
 function App() {
   const { palette } = usePaletteStore();
+  const [activeTab, setActiveTab] = useState(() => {
+    return (typeof window !== 'undefined' && window.innerWidth < 1024) ? 'editor' : 'ramps';
+  });
 
   useEffect(() => {
     const css = generateCSS(palette, '.dark', '.palette-preview-container');
@@ -65,7 +68,7 @@ function App() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="h-14 border-b border-border/60 bg-background/80 backdrop-blur-md sticky top-0 z-50 flex items-center">
-        <div className="max-w-7xl mx-auto w-full flex items-center px-6 gap-4 h-full">
+        <div className="max-w-7xl mx-auto w-full flex items-center px-4 sm:px-6 gap-4 h-full">
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
             <svg 
@@ -112,9 +115,9 @@ function App() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto w-full flex min-h-[calc(100vh-56px)] px-6">
+      <div className="max-w-7xl mx-auto w-full flex min-h-[calc(100vh-56px)] px-4 sm:px-6">
         {/* Sidebar */}
-        <aside className="w-72 shrink-0 border-r border-border/60 bg-background/60 flex flex-col">
+        <aside className="w-72 shrink-0 border-r border-border/60 bg-background/60 flex-col hidden lg:flex">
           <div className="flex-1 overflow-y-auto scrollbar-thin py-4 pr-4">
             <ColorEditor />
           </div>
@@ -122,16 +125,21 @@ function App() {
 
         {/* Main */}
         <main className="flex-1 min-w-0 overflow-y-auto scrollbar-thin">
-          <div className="py-6 pl-6 w-full">
-            <Tabs defaultValue="ramps">
-              <div className="flex items-center justify-between mb-6">
-                <TabsList className="h-8">
-                  <TabsTrigger value="ramps" className="text-xs h-7">Color Ramps</TabsTrigger>
-                  <TabsTrigger value="components" className="text-xs h-7">Components</TabsTrigger>
-                  <TabsTrigger value="contrast" className="text-xs h-7">Contrast</TabsTrigger>
-                  <TabsTrigger value="export" className="text-xs h-7">Export</TabsTrigger>
+          <div className="py-6 lg:pl-6 w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <div className="flex items-center justify-between mb-6 w-full overflow-x-auto scrollbar-none">
+                <TabsList className="h-8 w-full justify-start overflow-x-auto scrollbar-none flex-nowrap whitespace-nowrap lg:justify-start">
+                  <TabsTrigger value="editor" className="text-xs h-7 lg:hidden shrink-0">Colors</TabsTrigger>
+                  <TabsTrigger value="ramps" className="text-xs h-7 shrink-0">Color Ramps</TabsTrigger>
+                  <TabsTrigger value="components" className="text-xs h-7 shrink-0">Components</TabsTrigger>
+                  <TabsTrigger value="contrast" className="text-xs h-7 shrink-0">Contrast</TabsTrigger>
+                  <TabsTrigger value="export" className="text-xs h-7 shrink-0">Export</TabsTrigger>
                 </TabsList>
               </div>
+
+              <TabsContent value="editor" className="m-0 focus-visible:outline-none lg:hidden">
+                <ColorEditor />
+              </TabsContent>
 
               <TabsContent value="ramps" className="m-0 focus-visible:outline-none palette-preview-container">
                 <PaletteRamp />

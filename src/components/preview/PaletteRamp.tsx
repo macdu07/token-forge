@@ -1,20 +1,46 @@
+import { useState } from 'react';
 import type { ColorStep } from '@/types';
 import { usePaletteStore } from '@/store/paletteStore';
 import { cn } from '@/lib/utils';
+import { Check, Copy } from 'lucide-react';
 
 function Swatch({ step, className }: { step: ColorStep; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(`var(--${step.variable})`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
-    <div
-      className={cn('group relative flex-1 h-14 first:rounded-l-lg last:rounded-r-lg transition-all hover:flex-[1.4] cursor-default', className)}
+    <button
+      onClick={handleCopy}
+      className={cn(
+        'group relative flex-1 h-14 first:rounded-l-lg last:rounded-r-lg transition-all active:scale-95 hover:flex-[1.4] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 z-10 hover:z-20',
+        className
+      )}
       style={{ backgroundColor: step.value }}
-      title={`${step.variable}: ${step.value}`}
+      title={`Click to copy: var(--${step.variable}) (${step.value})`}
     >
-      <div className="absolute inset-x-0 bottom-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 pb-1">
-        <span className="text-[8px] font-mono leading-none bg-black/50 text-white px-1 py-0.5 rounded block truncate">
-          {step.index + 1}
+      <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+        ) : (
+          <Copy className="h-3.5 w-3.5 text-white opacity-60 hover:opacity-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+        )}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 pb-1 pointer-events-none">
+        <span className="text-[8px] font-mono leading-none bg-black/75 text-white px-1 py-0.5 rounded block truncate text-center">
+          {copied ? 'Copied!' : `${step.index + 1}`}
         </span>
       </div>
-    </div>
+    </button>
   );
 }
 

@@ -127,16 +127,19 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid grid-cols-3 h-9 w-full">
               <TabsTrigger value="css" className="text-xs">
-                <Hash className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                CSS Code
+                <Hash className="h-3.5 w-3.5 mr-1 shrink-0 hidden sm:inline-block" />
+                <span className="hidden sm:inline">CSS Code</span>
+                <span className="sm:hidden">CSS</span>
               </TabsTrigger>
               <TabsTrigger value="tokens" className="text-xs">
-                <FileJson className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                Tokens JSON
+                <FileJson className="h-3.5 w-3.5 mr-1 shrink-0 hidden sm:inline-block" />
+                <span className="hidden sm:inline">Tokens JSON</span>
+                <span className="sm:hidden">Tokens</span>
               </TabsTrigger>
               <TabsTrigger value="bricks" className="text-xs">
-                <FileJson className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                Bricks JSON
+                <FileJson className="h-3.5 w-3.5 mr-1 shrink-0 hidden sm:inline-block" />
+                <span className="hidden sm:inline">Bricks JSON</span>
+                <span className="sm:hidden">Bricks</span>
               </TabsTrigger>
             </TabsList>
 

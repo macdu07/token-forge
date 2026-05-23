@@ -59,41 +59,47 @@ export function ExportPanel() {
   return (
     <div className="space-y-4">
       {/* Dark mode selector setting */}
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Label className="text-xs text-muted-foreground">Dark mode selector</Label>
-          <div className="group relative flex items-center">
-            <Info className="h-3.5 w-3.5 text-muted-foreground/75 hover:text-foreground cursor-help transition-colors" />
-            <div className="absolute left-0 top-6 z-50 w-72 rounded-lg border border-border bg-popover p-2.5 shadow-md text-[11px] leading-relaxed text-muted-foreground hidden group-hover:block animate-in fade-in duration-100">
-              Defines the CSS selector that wraps dark mode color variables in the exported stylesheets. Use <code>.dark</code> or <code>[data-theme="dark"]</code> to match your site's dark mode toggle class or attribute.
+      <div className="flex flex-col md:flex-row md:items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+        <div className="flex items-center gap-1.5 shrink-0 justify-between md:justify-start">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground">Dark mode selector</Label>
+            <div className="group relative flex items-center">
+              <Info className="h-3.5 w-3.5 text-muted-foreground/75 hover:text-foreground cursor-help transition-colors" />
+              <div className="absolute left-0 top-6 z-50 w-72 rounded-lg border border-border bg-popover p-2.5 shadow-md text-[11px] leading-relaxed text-muted-foreground hidden group-hover:block animate-in fade-in duration-100">
+                Defines the CSS selector that wraps dark mode color variables in the exported stylesheets. Use <code>.dark</code> or <code>[data-theme="dark"]</code> to match your site's dark mode toggle class or attribute.
+              </div>
             </div>
           </div>
         </div>
-        <Input
-          value={darkSelector}
-          onChange={(e: any) => setDarkSelector(e.target.value)}
-          className="h-7 text-xs font-mono max-w-[220px]"
-          placeholder=".dark, [data-theme='dark'], ..."
-        />
-        <div className="flex gap-1 ml-auto">
-          {['.dark', '[data-theme="dark"]', '.bricks-is-frontend.dark'].map(s => (
-            <button key={s} onClick={() => setDarkSelector(s)}
-              className="text-[11px] px-2 py-1 rounded border border-border hover:bg-accent transition-colors font-mono">
-              {s}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto md:flex-1">
+          <Input
+            value={darkSelector}
+            onChange={(e: any) => setDarkSelector(e.target.value)}
+            className="h-7 text-xs font-mono w-full sm:max-w-[200px]"
+            placeholder=".dark, [data-theme='dark'], ..."
+          />
+          <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:ml-auto">
+            {['.dark', '[data-theme="dark"]', '.bricks-is-frontend.dark'].map(s => (
+              <button key={s} onClick={() => setDarkSelector(s)}
+                className="text-[11px] px-2 py-1 rounded border border-border hover:bg-accent transition-colors font-mono whitespace-nowrap">
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <Tabs defaultValue="css">
-        <TabsList className="h-8 text-xs">
-          <TabsTrigger value="css" className="text-xs h-7">CSS</TabsTrigger>
-          <TabsTrigger value="scss" className="text-xs h-7">SCSS</TabsTrigger>
-          <TabsTrigger value="bricks" className="text-xs h-7">Bricks JSON</TabsTrigger>
-          <TabsTrigger value="tailwind" className="text-xs h-7">Tailwind</TabsTrigger>
-          <TabsTrigger value="tokens" className="text-xs h-7">Tokens</TabsTrigger>
-          <TabsTrigger value="guide" className="text-xs h-7">Integration Guide</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between mb-2 w-full overflow-x-auto scrollbar-none">
+          <TabsList className="h-8 w-full justify-start overflow-x-auto scrollbar-none flex-nowrap whitespace-nowrap text-xs">
+            <TabsTrigger value="css" className="text-xs h-7 shrink-0">CSS</TabsTrigger>
+            <TabsTrigger value="scss" className="text-xs h-7 shrink-0">SCSS</TabsTrigger>
+            <TabsTrigger value="bricks" className="text-xs h-7 shrink-0">Bricks JSON</TabsTrigger>
+            <TabsTrigger value="tailwind" className="text-xs h-7 shrink-0">Tailwind</TabsTrigger>
+            <TabsTrigger value="tokens" className="text-xs h-7 shrink-0">Tokens</TabsTrigger>
+            <TabsTrigger value="guide" className="text-xs h-7 shrink-0">Integration Guide</TabsTrigger>
+          </TabsList>
+        </div>
 
         <div className="mt-4">
           <TabsContent value="css" className="m-0">

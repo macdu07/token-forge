@@ -124,7 +124,7 @@ export function ComponentPreview() {
       {/* Color swatches on backgrounds */}
       <section className="space-y-3">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Color on backgrounds</div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="p-4 rounded-xl space-y-2 bg-background border">
             <div className="text-xs text-muted-foreground mb-2">Light background</div>
             {palette.colors.slice(0, 4).map(c => (
