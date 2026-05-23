@@ -10,7 +10,7 @@ import { Trash2, Plus, ChevronDown, ChevronUp, Settings2, Copy, FileUp } from 'l
 import { PresetSelector } from '@/components/editor/PresetSelector';
 import { ImportModal } from '@/components/editor/ImportModal';
 import { cn } from '@/lib/utils';
-import { toHex } from '@/lib/color-engine';
+import { toHex, formatColorString } from '@/lib/color-engine';
 
 function ColorOptionsPanel({ id, options }: { id: string; options: ColorOptions }) {
   const { updateColorOptions } = usePaletteStore();
@@ -125,8 +125,8 @@ export function ColorEditor() {
           <div className="space-y-1">
             <Label className="text-[11px]">Color</Label>
             <div className="flex gap-2">
-              <input type="color" value={toHex(newLight)} onChange={(e: any) => setNewLight(e.target.value)} className="h-7 w-10 rounded border cursor-pointer bg-transparent p-0.5" />
-              <Input placeholder="#3b82f6 or oklch(...)" className="h-7 text-xs font-mono flex-1" value={newLight} onChange={(e: any) => setNewLight(e.target.value)} />
+              <input type="color" value={toHex(newLight)} onChange={(e: any) => setNewLight(formatColorString(e.target.value, 'oklch'))} className="h-7 w-10 rounded border cursor-pointer bg-transparent p-0.5" />
+              <Input placeholder="#3b82f6 or oklch(...)" className="h-7 text-xs font-mono flex-1" value={newLight} onChange={(e: any) => setNewLight(e.target.value)} onBlur={(e: any) => setNewLight(formatColorString(e.target.value, 'oklch'))} />
             </div>
           </div>
           <div className="flex gap-2">
@@ -186,8 +186,8 @@ export function ColorEditor() {
                 <div className="space-y-1">
                   <Label className="text-[11px] text-muted-foreground">Light base</Label>
                   <div className="flex gap-2">
-                    <input type="color" value={toHex(color.light)} onChange={(e: any) => updateColor(color.id, { light: e.target.value })} className="h-7 w-10 rounded border cursor-pointer bg-transparent p-0.5 shrink-0" />
-                    <Input value={color.light} className="h-7 text-xs font-mono" onChange={(e: any) => updateColor(color.id, { light: e.target.value })} />
+                    <input type="color" value={toHex(color.light)} onChange={(e: any) => updateColor(color.id, { light: formatColorString(e.target.value, color.options.outputFormat) })} className="h-7 w-10 rounded border cursor-pointer bg-transparent p-0.5 shrink-0" />
+                    <Input value={color.light} className="h-7 text-xs font-mono" onChange={(e: any) => updateColor(color.id, { light: e.target.value })} onBlur={(e: any) => updateColor(color.id, { light: formatColorString(e.target.value, color.options.outputFormat) })} />
                   </div>
                 </div>
 
@@ -200,8 +200,8 @@ export function ColorEditor() {
                   <div className="space-y-1 animate-in slide-in-from-top-1 duration-150">
                     <Label className="text-[11px] text-muted-foreground">Dark base</Label>
                     <div className="flex gap-2">
-                      <input type="color" value={toHex(color.dark || '#ffffff')} onChange={(e: any) => updateColor(color.id, { dark: e.target.value })} className="h-7 w-10 rounded border cursor-pointer bg-transparent p-0.5 shrink-0" />
-                      <Input value={color.dark || ''} className="h-7 text-xs font-mono" onChange={(e: any) => updateColor(color.id, { dark: e.target.value })} />
+                      <input type="color" value={toHex(color.dark || '#ffffff')} onChange={(e: any) => updateColor(color.id, { dark: formatColorString(e.target.value, color.options.outputFormat) })} className="h-7 w-10 rounded border cursor-pointer bg-transparent p-0.5 shrink-0" />
+                      <Input value={color.dark || ''} className="h-7 text-xs font-mono" onChange={(e: any) => updateColor(color.id, { dark: e.target.value })} onBlur={(e: any) => updateColor(color.id, { dark: formatColorString(e.target.value, color.options.outputFormat) })} />
                     </div>
                   </div>
                 )}

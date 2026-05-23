@@ -33,6 +33,25 @@ export function toHex(colorStr: string): string {
   }
 }
 
+export function formatColorString(colorStr: string, format: 'hex' | 'hsl' | 'oklch'): string {
+  try {
+    const parsed = parse(colorStr);
+    if (!parsed) return colorStr;
+    
+    if (format === 'hex') {
+      return formatHex(parsed) ?? colorStr;
+    }
+    if (format === 'hsl') {
+      const h = hsl(parsed);
+      return h ? formatCss(h) : formatCss(parsed);
+    }
+    const o = oklch(parsed);
+    return o ? formatCss(o) : formatCss(parsed);
+  } catch (e) {
+    return colorStr;
+  }
+}
+
 // Easing functions for interpolation
 function applyEasing(t: number, mode: string): number {
   switch (mode) {
